@@ -1,0 +1,20 @@
+<script>
+    class RenderedObject {
+        constructor (ctx, x, y, a) {
+            this.ctx = ctx;
+            this.x = x;
+            this.y = y;
+            this.a = a;
+        }
+
+        render () {
+            this.ctx.save();
+            this.ctx.translate(this.x, this.y);
+            this.ctx.rotate(this.a * Math.PI / 180);
+        }
+
+        afterRender () {
+            this.ctx.restore();
+        }
+    }
+</script>

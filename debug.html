@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title></title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="import" href="./cube.html">
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+            #debug {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas" width="500" height="500"></canvas>
+        <script>
+
+            let c = document.getElementById('canvas'),
+                ctx = c.getContext('2d');
+
+            let cube = new Cube(50);
+
+            function render () {
+
+                ctx.save();
+                // render stuff
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, c.width, c.height);
+                ctx.fillStyle = 'white';
+                ctx.shadowColor = 'white';
+                ctx.fillStyle = 'white';
+                ctx.strokeStyle = 'red';
+
+                ctx.translate(100, 100);
+
+                cube.rotateX(Math.PI / 180);
+                cube.rotateY(Math.PI / 180);
+                cube.rotateZ(Math.PI / 180);
+
+                cube.render(ctx);
+
+                requestAnimationFrame(render);
+
+                ctx.restore();
+            }
+
+            render();
+
+        </script>
+    </body>
+</html>

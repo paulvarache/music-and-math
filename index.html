@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title></title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <link rel="import" href="./triangle.html">
+        <link rel="import" href="./cube.html">
+        <link rel="import" href="./particle-system.html">
+        <link rel="import" href="./buffer-analyser.html">
+        <style>
+            html, body {
+                margin: 0;
+                padding: 0;
+            }
+            #debug {
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+            }
+            #input {
+                position: absolute;
+                top: 0;
+                right: 0;
+            }
+        </style>
+    </head>
+    <body>
+        <canvas id="canvas"></canvas>
+        <canvas id="debug"></canvas>
+        <input type="file" id="input">
+        <script>
+
+            let c = document.getElementById('canvas'),
+                d = document.getElementById('debug'),
+                ctx, debugCtx, buffer, data, lowData, lowPeaks, highData, t, totalTime, startedAt;
+
+            let lowAnalyser, highAnalyser;
+
+            let lowParticlesRight, lowParticlesLeft, highParticles, cubeParticles;
+
+            window.addEventListener('resize', fitWindow);
+
+            function hslToRgb (h, s, l) {
+                let r = Math.sin(h * Math.PI / 180) * l;
+                let g = Math.sin((h + 120) * Math.PI / 180) * l;
+                let b = Math.sin((h + 240) * Math.PI / 180) * l;
+
+                let avg = (r + g + b) / 3;
+
+                r = ((r - avg) * s + avg);
+                g = ((g - avg) * s + avg);
+                b = ((b - avg) * s + avg);
+
+                return {
+                    r: Math.floor(r * 255),
+                    g: Math.floor(g * 255),
+                    b: Math.floor(b * 255)
+                };
+            } 
+
+            function fitWindow () {
+                c.width = window.innerWidth;
+                c.height = window.innerHeight;
+                d.width = window.innerWidth;
+                d.height = 100;
+                ctx = c.getContext('2d');
+                debugCtx = d.getContext('2d');
+                lowParticlesLeft = new ParticleSystem({
+                    x: 0,
+                    y: c.height,
+                    gravity: 0.3,
+                    initialVel: 9,
+                    maxSize: 6,
+                    speed: 25,
+                    number: 7,
+                    dataGenerator: () => {
+                        return {
+                            triangle: new Triangle(ctx, 0, 0, 0, 0),
+                            color: `hsl(${54}, ${100}%, ${50 + Math.floor(Math.random() * 50)}%)`,
+                            s: 1
+                        };
+                    }
+                });
+                lowParticlesRight = new ParticleSystem({
+                    x: c.width,
+                    y: c.height,
+                    gravity: 0.3,
+                    initialVel: 9,
+                    maxSize: 6,
+                    speed: 25,
+                    number: 7,
+                    dataGenerator: () => {
+                        return {
+                            triangle: new Triangle(ctx, 0, 0, 0, 0),
+                            color: `hsl(${54}, ${100}%, ${50 + Math.floor(Math.random() * 50)}%)`,
+                            s: 1
+                        };
+                    }
+                });
+                highParticles = new ParticleSystem({
+                    x: c.width / 2,
+                    y: c.height / 2,
+                    gravity: 0.4,
+                    initialVel: 5,
+                    maxSize: 2,
+                    speed: 20,
+                    number: 5,
+                    dataGenerator: () => {
+                        return {
+                            triangle: new Triangle(ctx, 0, 0, 0, 0),
+                            color: '#' + Math.floor(Math.random() * 77215 + 16700000).toString(16),
+                            s: 1
+                        };
+                    }
+                });
+                cubeParticles = new ParticleSystem({
+                    x: c.width / 2,
+                    y: c.height / 2,
+                    gravity: 0.4,
+                    initialVel: 5,
+                    maxSize: 2,
+                    speed: 25,
+                    number: 3,
+                    dataGenerator: () => {
+                        return {
+                            cube: new Cube(20),
+                            color: '#' + Math.floor(Math.random() * 77215 + 16700000).toString(16),
+                            s: 1
+                        };
+                    }
+                });
+            }
+
+            let lastFrame;
+
+            let s = 0.8;
+
+            function update (timestamp) {
+
+                dt = timestamp - (lastFrame || 0);
+                lastFrame = timestamp;
+                // Update stuff
+
+                let i = Math.floor((audioContext.currentTime - startedAt) / buffer.duration * data.length),
+                    dh = highAnalyser.distanceToClosestPeak(i),
+                    dl = lowAnalyser.distanceToClosestPeak(i);
+
+                if (dh > 0 && dh < 2000) {
+                    //highParticles.generate();
+                    cubeParticles.generate();
+                }
+                if (dl > 0 && dl < 2000) {
+                    lowParticlesLeft.generate();
+                    lowParticlesRight.generate();
+                }
+
+                cubeParticles.tick(dt);
+                highParticles.tick(dt);
+                lowParticlesLeft.tick(dt);
+                lowParticlesRight.tick(dt);
+
+                highParticles.particles.forEach(p => {
+                    p.data.triangle.a += p.vx * 2
+                });
+
+                cubeParticles.particles.forEach(p => {
+                    p.data.cube.rotateX((p.vx * 2) * Math.PI / 180);
+                    p.data.cube.rotateY((p.vy * 2) * Math.PI / 180);
+                });
+
+                lowParticlesLeft.particles.forEach(p => {
+                    p.data.triangle.a += p.vx * 2
+                });
+
+                lowParticlesRight.particles.forEach(p => {
+                    p.data.triangle.a += p.vx * 2
+                });
+
+                render();
+                requestAnimationFrame(update);
+            }
+
+
+            function render () {
+
+                ctx.save();
+                // render stuff
+                ctx.fillStyle = 'black';
+                ctx.fillRect(0, 0, c.width, c.height);
+                ctx.fillStyle = 'white';
+                ctx.shadowColor = 'white';
+                // Debug
+                debugPeaks(highAnalyser.peaks, data, 30, 0);
+                debugPeaks(lowAnalyser.peaks, data, 30, 30);
+                debugCtx.fillStyle = 'blue';
+                debugCtx.fillRect((audioContext.currentTime - startedAt) / buffer.duration * d.width, 0, 1, 100);
+                // debug
+
+                highParticles.particles.forEach(p => {
+                    p.data.triangle.x = p.x;
+                    p.data.triangle.y = p.y;
+                    p.data.triangle.size = p.scale * 10 * p.data.s;
+                    ctx.fillStyle = p.data.color;
+                    ctx.shadowColor = p.data.color;
+                    ctx.shadowBlur = 15 * p.scale;
+                    p.data.triangle.render();
+                });
+
+                cubeParticles.particles.forEach(p => {
+                    ctx.save();
+                    ctx.translate(p.x, p.y);
+                    ctx.scale(p.scale, p.scale);
+                    ctx.strokeStyle = p.data.color;
+                    ctx.shadowColor = p.data.color;
+                    ctx.shadowBlur = 15 * p.scale;
+                    p.data.cube.render(ctx);
+                    ctx.restore();
+                });
+
+                lowParticlesLeft.particles.forEach(p => {
+                    p.data.triangle.x = p.x;
+                    p.data.triangle.y = p.y;
+                    p.data.triangle.size = p.scale * 15 * p.data.s;
+                    ctx.fillStyle = p.data.color;
+                    ctx.shadowColor = p.data.color;
+                    ctx.shadowBlur = 15 * p.scale;
+                    p.data.triangle.render();
+                });
+
+                lowParticlesRight.particles.forEach(p => {
+                    p.data.triangle.x = p.x;
+                    p.data.triangle.y = p.y;
+                    p.data.triangle.size = p.scale * 15 * p.data.s;
+                    ctx.fillStyle = p.data.color;
+                    ctx.shadowColor = p.data.color;
+                    ctx.shadowBlur = 15 * p.scale;
+                    p.data.triangle.render();
+                });
+
+                ctx.strokeStyle = 'white';
+
+                ctx.restore();
+            }
+
+            let audioContext = new AudioContext(),
+                offline;
+
+            let input = document.getElementById('input');
+
+            input.addEventListener('change', (e) => {
+                let reader = new FileReader();
+                reader.onload = (e) => {
+                    audioContext.decodeAudioData(e.target.result)
+                        .then(b => processBuffer(b));
+                };
+                reader.readAsArrayBuffer(e.target.files[0]);
+            });
+
+            function processBuffer (b) {
+                buffer = b;
+                data = b.getChannelData(0);
+                highAnalyser = new BufferAnalyser(b);
+                lowAnalyser = new BufferAnalyser(b);
+                return Promise.all([
+                    highAnalyser.analyse('highpass', 2200, 0.8),
+                    lowAnalyser.analyse('lowpass', 300, 0.6),
+                ]).then(_ => {
+                    let source = audioContext.createBufferSource();
+                    source.buffer = buffer;
+
+                    source.connect(audioContext.destination);
+
+                    startedAt = audioContext.currentTime;
+
+                    source.start();
+                    start();
+                });
+            }
+
+            /*fetch('/sample.mp3')
+                .then(r => r.arrayBuffer())
+                .then(ab => audioContext.decodeAudioData(ab))
+                .then(b => processBuffer(b));*/
+                
+
+            function start () {
+                fitWindow();
+                update();
+            }
+
+            function debugPeaks (peaks, data, height, offset) {
+                let x;
+                debugCtx.save();
+                debugCtx.fillStyle = 'white';
+                debugCtx.fillRect(0, offset, d.width, height);
+                debugCtx.fillStyle = 'black';
+                for (let i = 0; i < peaks.length; i++) {
+                    x = peaks[i] / data.length * d.width;
+                    debugCtx.fillRect(x, offset, 1, height);
+                }
+                debugCtx.restore();
+            }
+
+        </script>
+    </body>
+</html>

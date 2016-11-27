@@ -1,0 +1,32 @@
+<link rel="import" href="./rendered-object.html">
+<script>
+    class Triangle extends RenderedObject {
+
+        constructor (ctx, x, y, a, size) {
+            super(ctx, x, y, a);
+            this.size = size;
+        }
+
+        static coordFromAngle (a, d) {
+            return {
+                x: Math.cos(a) * d,
+                y: Math.sin(a) * d,
+            }
+        }
+
+        render () {
+            super.render();
+            let a = Math.sqrt(Math.pow(this.size, 2) - (Math.pow(this.size / 2 ,2)));
+            let p = Triangle.coordFromAngle(270 * Math.PI / 180, a / 2);
+            this.ctx.beginPath();
+            this.ctx.lineTo(p.x, p.y);
+            p = Triangle.coordFromAngle(30 * Math.PI / 180, a / 2);
+            this.ctx.lineTo(p.x, p.y);
+            p = Triangle.coordFromAngle(150 * Math.PI / 180, a / 2);
+            this.ctx.lineTo(p.x, p.y);
+            this.ctx.fill();
+            this.ctx.closePath();
+            this.afterRender();
+        }
+    }
+</script>
